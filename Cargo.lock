@@ -998,6 +998,8 @@ checksum = "3e52c148ef37f8c375d49d5a73aa70713125b7f19095948a923f80afdeb22ec2"
 name = "rust-python-tree-distances"
 version = "0.1.0"
 dependencies = [
+ "clap",
+ "flate2",
  "phylotree",
  "pyo3",
  "rayon",
