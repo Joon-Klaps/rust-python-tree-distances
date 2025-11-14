@@ -59,37 +59,6 @@ jobs:
     - name: Build release
       run: cargo build --release --verbose
 
-  python-build:
-    name: Build Python Wheels
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ['3.9', '3.10', '3.11', '3.12']
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-
-    - name: Install maturin
-      run: pip install maturin
-
-    - name: Build wheel
-      run: maturin build --release --features python
-
-    - name: Upload wheels
-      uses: actions/upload-artifact@v4
-      with:
-        name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
-        path: target/wheels/*.whl
-
   python-test:
     name: Python API Tests
     runs-on: ${{ matrix.os }}
@@ -115,11 +84,15 @@ jobs:
         path: target
         key: ${{ runner.os }}-cargo-build-target-py${{ matrix.python-version }}-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Install maturin and test dependencies
-      run: pip install maturin pytest
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install maturin pytest
 
     - name: Build and install package
-      run: maturin develop --release --features python
+      run: pip install -e . --verbose
+      env:
+        RUST_BACKTRACE: 1
 
     - name: Test Python import
       run: python -c "import rust_python_tree_distances; print('Import successful!')"

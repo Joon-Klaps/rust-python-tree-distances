@@ -84,7 +84,8 @@ impl TreeSnapshot {
     pub fn from_tree(tree: &PhyloTree) -> Result<Self, TreeError> {
         let rooted = tree.is_rooted()?;
         // Step 1: Extract leaf names and sort them alphabetically
-        let mut leaf_names: Vec<(usize, String)> = tree.get_leaves()
+        let mut leaf_names: Vec<(usize, String)> = tree
+            .get_leaves()
             .iter()
             .map(|leaf_id| {
                 let leaf_name = tree.get(leaf_id).unwrap().name.clone().unwrap_or_default();
@@ -96,7 +97,7 @@ impl TreeSnapshot {
         leaf_names.sort_by(|a, b| a.1.cmp(&b.1));
 
         let num_leaves = leaf_names.len();
-        let words = (num_leaves + 63) / 64;
+        let words = num_leaves.div_ceil(64);
 
         // Step 2: Create mapping: node_id → bit_index (based on sorted names)
         let node_id_to_leaf_index: HashMap<usize, usize> = leaf_names
@@ -117,12 +118,8 @@ impl TreeSnapshot {
         let (parts, lengths) = Self::collect_partitions(tree, root_id, &cache)?;
 
         // Step 5: Canonicalize partitions (always store side WITHOUT leaf 0)
-        let (parts_canonical, lengths_canonical) = Self::canonicalize_partitions(
-            parts,
-            lengths,
-            words,
-            num_leaves,
-        );
+        let (parts_canonical, lengths_canonical) =
+            Self::canonicalize_partitions(parts, lengths, words, num_leaves);
 
         // Step 6: Record root's children for rooted tree adjustment
         let root_children = Self::get_root_children(tree, root_id, &cache)?;
@@ -171,13 +168,8 @@ impl TreeSnapshot {
         // Merge all child bitsets with OR
         let mut bitset = Bitset::zeros(words);
         for &child_id in &node.children {
-            let child_bitset = Self::compute_bitsets(
-                child_id,
-                tree,
-                node_id_to_leaf_index,
-                words,
-                cache,
-            );
+            let child_bitset =
+                Self::compute_bitsets(child_id, tree, node_id_to_leaf_index, words, cache);
             bitset.or_assign(&child_bitset);
         }
 
@@ -200,11 +192,10 @@ impl TreeSnapshot {
     fn collect_partitions(
         tree: &PhyloTree,
         root_id: usize,
-        cache: &HashMap<usize, Bitset>
+        cache: &HashMap<usize, Bitset>,
     ) -> Result<(Vec<Bitset>, Vec<f64>), TreeError> {
         let mut parts = Vec::new();
         let mut lengths = Vec::new();
-
 
         // Unless it becomes a bottleneck, we can parallelize this loop later
         for (&node_id, bitset) in cache.iter() {
@@ -333,7 +324,6 @@ impl TreeSnapshot {
     }
 
     /// Sort partitions lexicographically for edge length matching later.
-
     /// Get bitsets for root's immediate children (for rooted RF adjustment).
     ///
     /// In rooted trees, we need to know if two trees have the same root
@@ -492,7 +482,7 @@ mod tests {
         node3.set(1); // B
         node3.set(2); // C
         assert_eq!(node3.0[0], 0b00110);
-        assert_eq!((node3.0[0] & 1) != 0, false); // No A, keep as-is
+        assert!((node3.0[0] & 1) == 0); // No A, keep as-is
 
         // node2: {A, B, C}
         let mut node2 = Bitset::zeros(1);
@@ -500,7 +490,7 @@ mod tests {
         node2.set(1); // B
         node2.set(2); // C
         assert_eq!(node2.0[0], 0b00111);
-        assert_eq!((node2.0[0] & 1) != 0, true); // Has A, need to flip!
+        assert!((node2.0[0] & 1) != 0); // Has A, need to flip!
         // Flip to complement {D, E} = 0b11000
 
         // node1: {A, B, C, D}
@@ -510,7 +500,7 @@ mod tests {
         node1.set(2); // C
         node1.set(3); // D
         assert_eq!(node1.0[0], 0b01111);
-        assert_eq!((node1.0[0] & 1) != 0, true); // Has A, need to flip!
+        assert!((node1.0[0] & 1) != 0); // Has A, need to flip!
         // Flip to complement {E} = 0b10000
 
         // After canonicalization and sorting:
@@ -561,8 +551,8 @@ mod tests {
         // (the side without leaf 0)
 
         // Check if leaf 0 is set
-        assert_eq!((part_ab.0[0] & 1) != 0, true);  // A is in {A,B}
-        assert_eq!((part_cd.0[0] & 1) != 0, false); // A is NOT in {C,D}
+        assert!((part_ab.0[0] & 1) != 0); // A is in {A,B}
+        assert!((part_cd.0[0] & 1) == 0); // A is NOT in {C,D}
 
         // So we'd flip {A,B} to its complement {C,D}
     }
@@ -599,24 +589,16 @@ mod tests {
         // Simulate two trees with same taxa but different node IDs
 
         // Tree 1: IDs [7, 3, 15] → Names ["Human", "Chimp", "Gorilla"]
-        let tree1_leaves = vec![
-            (7, "Human"),
-            (3, "Chimp"),
-            (15, "Gorilla"),
-        ];
+        let tree1_leaves = vec![(7, "Human"), (3, "Chimp"), (15, "Gorilla")];
 
         // Tree 2: IDs [5, 8, 12] → Names ["Human", "Chimp", "Gorilla"]
-        let tree2_leaves = vec![
-            (5, "Human"),
-            (8, "Chimp"),
-            (12, "Gorilla"),
-        ];
+        let tree2_leaves = vec![(5, "Human"), (8, "Chimp"), (12, "Gorilla")];
 
         // After sorting by NAME (not ID):
         let mut sorted1 = tree1_leaves.clone();
         let mut sorted2 = tree2_leaves.clone();
-        sorted1.sort_by(|a, b| a.1.cmp(&b.1));
-        sorted2.sort_by(|a, b| a.1.cmp(&b.1));
+        sorted1.sort_by(|a, b| a.1.cmp(b.1));
+        sorted2.sort_by(|a, b| a.1.cmp(b.1));
 
         // Both now have: Chimp=0, Gorilla=1, Human=2
         assert_eq!(sorted1[0].1, "Chimp");
@@ -659,23 +641,23 @@ mod tests {
         // Simulate two trees with same taxa but different node IDs
 
         // Tree 1: Chimp=0, Human=1, Gorilla=2
-        let mut leaves1 = vec![(0, "Chimp"), (1, "Human"), (2, "Gorilla")];
+        let mut leaves1 = [(0, "Chimp"), (1, "Human"), (2, "Gorilla")];
 
         // Tree 2: Different node IDs, different order
-        let mut leaves2 = vec![(5, "Human"), (3, "Chimp"), (7, "Gorilla")];
+        let mut leaves2 = [(5, "Human"), (3, "Chimp"), (7, "Gorilla")];
 
         // After sorting by name, both should have same index mapping
-        leaves1.sort_by(|a, b| a.1.cmp(&b.1));
-        leaves2.sort_by(|a, b| a.1.cmp(&b.1));
+        leaves1.sort_by(|a, b| a.1.cmp(b.1));
+        leaves2.sort_by(|a, b| a.1.cmp(b.1));
 
         // Both should map to: Chimp=0, Gorilla=1, Human=2
-        assert_eq!(leaves1[0].1, "Chimp");   // index 0
+        assert_eq!(leaves1[0].1, "Chimp"); // index 0
         assert_eq!(leaves1[1].1, "Gorilla"); // index 1
-        assert_eq!(leaves1[2].1, "Human");   // index 2
+        assert_eq!(leaves1[2].1, "Human"); // index 2
 
-        assert_eq!(leaves2[0].1, "Chimp");   // index 0
+        assert_eq!(leaves2[0].1, "Chimp"); // index 0
         assert_eq!(leaves2[1].1, "Gorilla"); // index 1
-        assert_eq!(leaves2[2].1, "Human");   // index 2
+        assert_eq!(leaves2[2].1, "Human"); // index 2
 
         // Now partition {Human, Gorilla} = bits 1,2 = 0b0110 in BOTH trees!
     }

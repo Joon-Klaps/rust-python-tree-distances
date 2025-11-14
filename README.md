@@ -103,26 +103,24 @@ rust-python-tree-distances \                                                    
 
 ---
 
-# Python API
+## Python API
 
 The package also provides Python bindings for easy integration into Python workflows.
 
-## Installation
+### Installation
 
-### From source (requires Rust)
+From source (requires Rust):
 
 ```bash
+# Using pip (recommended)
+pip install -e .
+
+# Or using maturin directly
 pip install maturin
 maturin develop --release
 ```
 
-<!-- ### From wheel (coming soon)
-
-```bash
-pip install rust-python-tree-distances
-``` -->
-
-## Quick Start
+### Quick Start
 
 ```python
 import rust_python_tree_distances as rtd

@@ -1,11 +1,11 @@
-use std::fs;
-use std::path::Path;
 use phylotree::tree::Tree;
 use std::collections::HashMap;
+use std::fs;
 use std::io::{self, Write};
+use std::path::Path;
 
-use flate2::write::GzEncoder;
 use flate2::Compression;
+use flate2::write::GzEncoder;
 
 /// Strip BEAST annotations from Newick strings.
 ///
@@ -38,13 +38,17 @@ pub fn read_beast_trees<P: AsRef<Path>>(
     burnin_trees: usize,
     burnin_states: usize,
     use_real_taxa: bool,
-) ->  (HashMap<String, String>, Vec<(String, Tree)>) {
+) -> (HashMap<String, String>, Vec<(String, Tree)>) {
     let content = match fs::read_to_string(path.as_ref()) {
         Ok(s) => s,
-        Err(e) => { eprintln!("Failed to read {:?}: {e}", path.as_ref()); return (HashMap::new(), Vec::new()); }
+        Err(e) => {
+            eprintln!("Failed to read {:?}: {e}", path.as_ref());
+            return (HashMap::new(), Vec::new());
+        }
     };
 
-    let base_name = path.as_ref()
+    let base_name = path
+        .as_ref()
         .file_name()
         .and_then(|s| s.to_str())
         .map(|s| s.trim_end_matches(".trees"))
@@ -55,29 +59,31 @@ pub fn read_beast_trees<P: AsRef<Path>>(
     let trees = collect_tree_blocks(&content)
         .into_iter()
         .enumerate()
-
         //generate tree name & extract state number
-        .map(|(idx,tree)| {
-            let state = extract_state(&tree.header);
+        .map(|(idx, tree)| {
+            let state = extract_state(tree.header);
             (idx, tree, state, format!("{base_name}_tree_STATE{state}"))
         })
-
         // Filter out burn-in trees based on count and/or state number if 0 we don't filter
         .filter(|(idx, _tree, state, _name)| {
-                (burnin_trees == 0 && burnin_states == 0) ||
-                (burnin_trees > 0 && *idx >= burnin_trees) ||
-                (burnin_states > 0 && *state > burnin_states)
+            (burnin_trees == 0 && burnin_states == 0)
+                || (burnin_trees > 0 && *idx >= burnin_trees)
+                || (burnin_states > 0 && *state > burnin_states)
         })
-
         // read in the files
-        .filter_map(|(idx,tree, _state, name)| {
+        .filter_map(|(idx, tree, _state, name)| {
             // Strip BEAST annotations from newick string (e.g., [&rate=...])
             // BEAST format: :[&rate=X.XX]length -> :length
             let newick = strip_beast_annotations(&tree.body);
             let mut phylo_tree = match phylotree::tree::Tree::from_newick(&newick) {
                 Ok(t) => t,
                 Err(e) => {
-                    eprintln!("Failed to parse tree {} at index {}: {}", path.as_ref().display(), idx, e);
+                    eprintln!(
+                        "Failed to parse tree {} at index {}: {}",
+                        path.as_ref().display(),
+                        idx,
+                        e
+                    );
                     return None;
                 }
             };
@@ -98,7 +104,8 @@ fn extract_state(header: &str) -> usize {
     if let Some(start) = header.to_ascii_uppercase().find("STATE_") {
         let num_start = start + 6; // length of "STATE_"
         let rest = &header[num_start..];
-        let state = rest.chars()
+        let state = rest
+            .chars()
             .take_while(|c| c.is_ascii_digit())
             .collect::<String>();
         if let Ok(num) = state.parse::<usize>() {
@@ -108,7 +115,10 @@ fn extract_state(header: &str) -> usize {
     0
 }
 
-struct TreeBlock<'a> { header: &'a str, body: String }
+struct TreeBlock<'a> {
+    header: &'a str,
+    body: String,
+}
 
 fn collect_tree_blocks(content: &str) -> Vec<TreeBlock<'_>> {
     content
@@ -132,7 +142,7 @@ fn parse_taxon_block(content: &str) -> HashMap<String, String> {
         .take_while(|line| !line.trim().to_ascii_uppercase().starts_with(";"))
         // STRUCTURE:
         // 1 '1959.M.CD.59.ZR59',
-		// 2 '1960.DRC60A',
+        // 2 '1960.DRC60A',
         .filter_map(|line| {
             let line = line.trim().trim_end_matches(',');
             let mut parts = line.split_whitespace();
@@ -143,13 +153,13 @@ fn parse_taxon_block(content: &str) -> HashMap<String, String> {
         .collect::<HashMap<_, _>>()
 }
 
-pub fn rename_leaf_nodes(phylo_tree: &mut Tree, translate: &std::collections::HashMap<String, String>) {
+pub fn rename_leaf_nodes(
+    phylo_tree: &mut Tree,
+    translate: &std::collections::HashMap<String, String>,
+) {
     for leaf_id in phylo_tree.get_leaves() {
         if let Ok(node) = phylo_tree.get_mut(&leaf_id) {
-            node.name = node
-                .name
-                .as_ref()
-                .and_then(|n| translate.get(n).cloned());
+            node.name = node.name.as_ref().and_then(|n| translate.get(n).cloned());
         }
     }
 }
@@ -186,7 +196,9 @@ pub fn write_matrix_tsv<P: AsRef<Path>, T: std::fmt::Display>(
     // Header row
     write!(&mut out, "\t")?;
     for (k, name) in names.iter().enumerate() {
-        if k > 0 { write!(&mut out, "\t")?; }
+        if k > 0 {
+            write!(&mut out, "\t")?;
+        }
         write!(&mut out, "{}", name)?;
     }
     writeln!(&mut out)?;

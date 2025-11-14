@@ -54,8 +54,8 @@ impl Bitset {
     /// ```
     #[inline]
     pub fn set(&mut self, idx: usize) {
-        let word = idx >> 6;     // Equivalent to idx / 64
-        let bit = idx & 63;      // Equivalent to idx % 64
+        let word = idx >> 6; // Equivalent to idx / 64
+        let bit = idx & 63; // Equivalent to idx % 64
         self.0[word] |= 1u64 << bit;
     }
 
@@ -157,14 +157,14 @@ mod tests {
     fn test_mini_tree_example() {
         // Partition for node2: {B, C}
         let mut node2 = Bitset::zeros(1);
-        node2.set(1);  // B
-        node2.set(2);  // C
+        node2.set(1); // B
+        node2.set(2); // C
         assert_eq!(node2.0[0], 0b0110);
         assert_eq!(node2.count_ones(), 2);
 
         // Partition for node1: {A} ∪ {B, C}
         let mut node1 = Bitset::zeros(1);
-        node1.set(0);  // A
+        node1.set(0); // A
         node1.or_assign(&node2);
         assert_eq!(node1.0[0], 0b0111);
         assert_eq!(node1.count_ones(), 3);
@@ -174,10 +174,10 @@ mod tests {
     fn test_large_tree() {
         // Test with more than 64 leaves (multiple words)
         let mut bs = Bitset::zeros(2);
-        bs.set(0);    // First word
-        bs.set(63);   // Last bit of first word
-        bs.set(64);   // First bit of second word
-        bs.set(127);  // Last bit of second word
+        bs.set(0); // First word
+        bs.set(63); // Last bit of first word
+        bs.set(64); // First bit of second word
+        bs.set(127); // Last bit of second word
 
         assert_eq!(bs.count_ones(), 4);
         assert_eq!(bs.0[0], 1u64 | (1u64 << 63));

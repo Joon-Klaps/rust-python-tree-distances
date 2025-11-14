@@ -9,18 +9,15 @@
 //!
 //! Public API kept stable by re-exporting key items from the new modules.
 
+pub mod bitset;
 pub mod distances;
 pub mod io;
-pub mod bitset;
 pub mod snapshot;
 
 #[cfg(feature = "python")]
 pub mod api;
 
 // Re-export frequently used types & functions
-pub use io::{read_beast_trees, write_matrix_tsv};
 pub use bitset::Bitset;
+pub use io::{read_beast_trees, write_matrix_tsv};
 pub use snapshot::TreeSnapshot;
-
-
-

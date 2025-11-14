@@ -3,15 +3,15 @@
 //! Provides Python functions for computing pairwise tree distances
 //! from BEAST/NEXUS tree files.
 
-use pyo3::prelude::*;
+use phylotree::tree::Tree as PhyloTree;
 use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
 use rayon::prelude::*;
 use std::collections::HashSet;
-use phylotree::tree::Tree as PhyloTree;
 
+use crate::distances::{kf_from_snapshots, rf_from_snapshots, weighted_rf_from_snapshots};
 use crate::io::read_beast_trees;
 use crate::snapshot::TreeSnapshot;
-use crate::distances::{rf_from_snapshots, weighted_rf_from_snapshots, kf_from_snapshots};
 
 /// Compute pairwise Robinson-Foulds distances from multiple tree files.
 ///
@@ -45,7 +45,7 @@ fn pairwise_rf(
     // Build snapshots
     let snapshots: Vec<TreeSnapshot> = trees
         .iter()
-        .map(|tree| TreeSnapshot::from_tree(tree))
+        .map(TreeSnapshot::from_tree)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| PyValueError::new_err(format!("Failed to create tree snapshot: {}", e)))?;
 
@@ -54,10 +54,9 @@ fn pairwise_rf(
     let mut matrix = vec![vec![0usize; n]; n];
 
     // Parallel computation across all pairs
-    let pairs: Vec<(usize, usize, usize)> = (0..n).into_par_iter()
-        .flat_map_iter(|i| {
-            (i+1..n).map(move |j| (i, j))
-        })
+    let pairs: Vec<(usize, usize, usize)> = (0..n)
+        .into_par_iter()
+        .flat_map_iter(|i| (i + 1..n).map(move |j| (i, j)))
         .map(|(i, j)| {
             let dist = rf_from_snapshots(&snapshots[i], &snapshots[j]);
             (i, j, dist)
@@ -103,17 +102,16 @@ fn pairwise_weighted_rf(
 
     let snapshots: Vec<TreeSnapshot> = trees
         .iter()
-        .map(|tree| TreeSnapshot::from_tree(tree))
+        .map(TreeSnapshot::from_tree)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| PyValueError::new_err(format!("Failed to create tree snapshot: {}", e)))?;
 
     let n = snapshots.len();
     let mut matrix = vec![vec![0.0f64; n]; n];
 
-    let pairs: Vec<(usize, usize, f64)> = (0..n).into_par_iter()
-        .flat_map_iter(|i| {
-            (i+1..n).map(move |j| (i, j))
-        })
+    let pairs: Vec<(usize, usize, f64)> = (0..n)
+        .into_par_iter()
+        .flat_map_iter(|i| (i + 1..n).map(move |j| (i, j)))
         .map(|(i, j)| {
             let dist = weighted_rf_from_snapshots(&snapshots[i], &snapshots[j]);
             (i, j, dist)
@@ -158,17 +156,16 @@ fn pairwise_kf(
 
     let snapshots: Vec<TreeSnapshot> = trees
         .iter()
-        .map(|tree| TreeSnapshot::from_tree(tree))
+        .map(TreeSnapshot::from_tree)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| PyValueError::new_err(format!("Failed to create tree snapshot: {}", e)))?;
 
     let n = snapshots.len();
     let mut matrix = vec![vec![0.0f64; n]; n];
 
-    let pairs: Vec<(usize, usize, f64)> = (0..n).into_par_iter()
-        .flat_map_iter(|i| {
-            (i+1..n).map(move |j| (i, j))
-        })
+    let pairs: Vec<(usize, usize, f64)> = (0..n)
+        .into_par_iter()
+        .flat_map_iter(|i| (i + 1..n).map(move |j| (i, j)))
         .map(|(i, j)| {
             let dist = kf_from_snapshots(&snapshots[i], &snapshots[j]);
             (i, j, dist)
@@ -195,7 +192,7 @@ fn read_all_trees(
 
     for (file_idx, path) in paths.iter().enumerate() {
         let (_taxons, named_trees) = read_beast_trees(
-            &std::path::PathBuf::from(path),
+            std::path::PathBuf::from(path),
             burnin_trees,
             burnin_states,
             use_real_taxa,
@@ -217,7 +214,9 @@ fn read_all_trees(
     }
 
     if all_trees.is_empty() {
-        return Err(PyValueError::new_err("No trees found in any of the provided files"));
+        return Err(PyValueError::new_err(
+            "No trees found in any of the provided files",
+        ));
     }
 
     Ok((all_tree_names, all_trees))
@@ -231,7 +230,7 @@ fn sanity_check_trees(trees: &[PhyloTree]) -> PyResult<()> {
 
     if trees.len() < 2 {
         return Err(PyValueError::new_err(
-            "Need at least 2 trees to compute pairwise distances"
+            "Need at least 2 trees to compute pairwise distances",
         ));
     }
 
@@ -254,7 +253,9 @@ fn sanity_check_trees(trees: &[PhyloTree]) -> PyResult<()> {
         if leaves.len() != first_leaf_count {
             return Err(PyValueError::new_err(format!(
                 "Tree {} has {} leaves, but tree 0 has {} leaves. All trees must have the same number of leaves.",
-                idx, leaves.len(), first_leaf_count
+                idx,
+                leaves.len(),
+                first_leaf_count
             )));
         }
 
