@@ -42,7 +42,7 @@ rust-python-tree-distances \
 ```
 
 >[!WARNING]
-> kf & weighted distance metric do not yet work as expected.
+> kf & weighted distance metric are not yet deterministic.
 
 Flags and options:
 
@@ -100,3 +100,54 @@ rust-python-tree-distances \                                                    
 - If no trees are parsed, verify the input is a valid NEXUS `.trees` file and adjust `--burnin-*` settings.
 - Use `-q` when writing to stdout and piping to other tools to suppress timing messages.
 - For gzipped output, ensure the output filename ends with `.gz`.
+
+---
+
+# Python API
+
+The package also provides Python bindings for easy integration into Python workflows.
+
+## Installation
+
+### From source (requires Rust)
+
+```bash
+pip install maturin
+maturin develop --release
+```
+
+<!-- ### From wheel (coming soon)
+
+```bash
+pip install rust-python-tree-distances
+``` -->
+
+## Quick Start
+
+```python
+import rust_python_tree_distances as rtd
+
+# Compute Robinson-Foulds distances
+tree_names, rf_matrix = rtd.pairwise_rf(
+    paths=["file1.trees", "file2.trees"],
+    burnin_trees=10,  # Skip first 10 trees from each file
+    burnin_states=0,   # Skip trees with STATE < 0
+    use_real_taxa=True # Use TRANSLATE block if available, set to true if multiple files are provided
+)
+
+# Compute Weighted RF distances (considers branch lengths)
+tree_names, wrf_matrix = rtd.pairwise_weighted_rf(
+    paths=["file1.trees"],
+    burnin_trees=10
+)
+
+# Compute Kuhner-Felsenstein distances
+tree_names, kf_matrix = rtd.pairwise_kf(
+    paths=["file1.trees"],
+    burnin_trees=10
+)
+
+# Output is a list of tree names and a 2D distance matrix
+print(f"Computed distances for {len(tree_names)} trees")
+print(f"RF distance between tree 0 and 1: {rf_matrix[0][1]}")
+```

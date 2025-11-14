@@ -1,3 +1,8 @@
 /target
 bigdata/
 out/
+Cargo.lock
+__pycache__/
+*.pyc
+.venv
+.pytest_cache/

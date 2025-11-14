@@ -7,6 +7,32 @@ use std::io::{self, Write};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 
+/// Strip BEAST annotations from Newick strings.
+///
+/// BEAST format includes annotations like :[&rate=0.123]2.45 where 2.45 is the actual branch length.
+/// This function removes the [&...] annotations while preserving the branch lengths.
+/// We shouldn't be needing, this TODO: update phylotree to handle BEAST annotations directly.
+fn strip_beast_annotations(newick: &str) -> String {
+    let mut result = String::with_capacity(newick.len());
+    let mut in_annotation = false;
+    let mut chars = newick.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '[' && chars.peek() == Some(&'&') {
+            // Start of BEAST annotation
+            in_annotation = true;
+        } else if ch == ']' && in_annotation {
+            // End of BEAST annotation
+            in_annotation = false;
+        } else if !in_annotation {
+            // Only copy characters outside annotations
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
 pub fn read_beast_trees<P: AsRef<Path>>(
     path: P,
     burnin_trees: usize,
@@ -45,8 +71,10 @@ pub fn read_beast_trees<P: AsRef<Path>>(
 
         // read in the files
         .filter_map(|(idx,tree, _state, name)| {
-            let newick = &tree.body;
-            let mut phylo_tree = match phylotree::tree::Tree::from_newick(newick) {
+            // Strip BEAST annotations from newick string (e.g., [&rate=...])
+            // BEAST format: :[&rate=X.XX]length -> :length
+            let newick = strip_beast_annotations(&tree.body);
+            let mut phylo_tree = match phylotree::tree::Tree::from_newick(&newick) {
                 Ok(t) => t,
                 Err(e) => {
                     eprintln!("Failed to parse tree {} at index {}: {}", path.as_ref().display(), idx, e);
